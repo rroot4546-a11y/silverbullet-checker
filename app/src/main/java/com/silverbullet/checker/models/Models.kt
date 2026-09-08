@@ -95,6 +95,7 @@ data class CheckConfig(
     var customContentType: String = "application/json",
     var customSuccessMarker: String = "",
     var customFailMarker: String = "",
+    var twoCaptchaKey: String = "",
     var captureHits: Boolean = true,
     var captureFails: Boolean = false,
     var retries: Int = 1

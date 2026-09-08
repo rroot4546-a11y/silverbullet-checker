@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var etThreads: EditText
     private lateinit var etTimeout: EditText
     private lateinit var etRetries: EditText
+    private lateinit var etCaptchaKey: EditText
     private lateinit var switchProxy: Switch
     private lateinit var btnLoadCombo: Button
     private lateinit var btnLoadProxy: Button
@@ -94,6 +95,7 @@ class MainActivity : AppCompatActivity() {
         etThreads = findViewById(R.id.etThreads)
         etTimeout = findViewById(R.id.etTimeout)
         etRetries = findViewById(R.id.etRetries)
+        etCaptchaKey = findViewById(R.id.etCaptchaKey)
         switchProxy = findViewById(R.id.switchProxy)
         btnLoadCombo = findViewById(R.id.btnLoadCombo)
         btnLoadProxy = findViewById(R.id.btnLoadProxy)
@@ -175,6 +177,7 @@ class MainActivity : AppCompatActivity() {
             customContentType = etCustomContentType.text.toString().trim(),
             customSuccessMarker = etCustomSuccess.text.toString().trim(),
             customFailMarker = etCustomFail.text.toString().trim(),
+            twoCaptchaKey = etCaptchaKey.text.toString().trim(),
             retries = etRetries.text.toString().toIntOrNull() ?: 1
         )
 
