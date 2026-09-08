@@ -651,7 +651,7 @@ stats.cpm = stats.computeCpm()
                     wv.settings.userAgentString =
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
                     wv.webViewClient = object : WebViewClient() {
-                        override fun onPageStarted(view: WebView?, url: String?) {
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                             if (settled) return
                             val hookJs = "(function(){if(window.__sb_hooked)return;window.__sb_hooked=true;" +
                                 "var o=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(b){" +
