@@ -7,7 +7,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.net.InetSocketAddress
-import java.net.Proxy
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
@@ -49,8 +48,8 @@ class AccountChecker(private val config: CheckConfig) {
             val proxy = getNextProxy()
             if (proxy != null) {
                 val okProxy = when (config.proxyType) {
-                    ProxyType.HTTP -> Proxy(Proxy.Type.HTTP, InetSocketAddress(proxy.ip, proxy.port))
-                    ProxyType.SOCKS4, ProxyType.SOCKS5 -> Proxy(Proxy.Type.SOCKS, InetSocketAddress(proxy.ip, proxy.port))
+                    ProxyType.HTTP -> java.net.Proxy(java.net.Proxy.Type.HTTP, InetSocketAddress(proxy.ip, proxy.port))
+                    ProxyType.SOCKS4, ProxyType.SOCKS5 -> java.net.Proxy(java.net.Proxy.Type.SOCKS, InetSocketAddress(proxy.ip, proxy.port))
                 }
                 builder.proxy(okProxy)
             }
@@ -445,7 +444,7 @@ class AccountChecker(private val config: CheckConfig) {
         })
     }
 
-    private fun checkCustom(combo: Combo): Account = suspendCoroutine { cont ->
+    private suspend fun checkCustom(combo: Combo): Account = suspendCoroutine { cont ->
         val url = config.customUrl.ifBlank { CheckModule.CUSTOM.endpoint }
         if (url.isEmpty()) {
             cont.resume(createResult(combo, AccountStatus.ERROR, "Custom module needs a URL"))
