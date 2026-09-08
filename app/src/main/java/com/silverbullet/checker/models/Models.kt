@@ -89,6 +89,12 @@ data class CheckConfig(
     var useProxy: Boolean = false,
     var proxyType: ProxyType = ProxyType.HTTP,
     var module: CheckModule = CheckModule.GENERIC,
+    var customUrl: String = "",
+    var customMethod: String = "POST",
+    var customBodyTemplate: String = "{\"email\":\"{email}\",\"password\":\"{password}\"}",
+    var customContentType: String = "application/json",
+    var customSuccessMarker: String = "",
+    var customFailMarker: String = "",
     var captureHits: Boolean = true,
     var captureFails: Boolean = false,
     var retries: Int = 1

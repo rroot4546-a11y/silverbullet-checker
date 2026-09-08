@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.widget.AdapterView
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,6 +21,13 @@ import com.silverbullet.checker.utils.FileUtils
 class MainActivity : AppCompatActivity() {
 
     private lateinit var spinnerModule: Spinner
+    private lateinit var customPanel: LinearLayout
+    private lateinit var etCustomUrl: EditText
+    private lateinit var spCustomMethod: Spinner
+    private lateinit var etCustomBody: EditText
+    private lateinit var etCustomContentType: EditText
+    private lateinit var etCustomSuccess: EditText
+    private lateinit var etCustomFail: EditText
     private lateinit var etComboFile: EditText
     private lateinit var etProxyFile: EditText
     private lateinit var etThreads: EditText
@@ -74,6 +82,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun initViews() {
         spinnerModule = findViewById(R.id.spinnerModule)
+        customPanel = findViewById(R.id.customPanel)
+        etCustomUrl = findViewById(R.id.etCustomUrl)
+        spCustomMethod = findViewById(R.id.spCustomMethod)
+        etCustomBody = findViewById(R.id.etCustomBody)
+        etCustomContentType = findViewById(R.id.etCustomContentType)
+        etCustomSuccess = findViewById(R.id.etCustomSuccess)
+        etCustomFail = findViewById(R.id.etCustomFail)
         etComboFile = findViewById(R.id.etComboFile)
         etProxyFile = findViewById(R.id.etProxyFile)
         etThreads = findViewById(R.id.etThreads)
@@ -101,6 +116,15 @@ class MainActivity : AppCompatActivity() {
         val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, modules)
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerModule.adapter = spinnerAdapter
+
+        spinnerModule.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                val isCustom = CheckModule.values()[position] == CheckModule.CUSTOM
+                customPanel.visibility = if (isCustom) View.VISIBLE else View.GONE
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
     }
 
     private fun setupListeners() {
@@ -128,6 +152,12 @@ class MainActivity : AppCompatActivity() {
             etProxyFile.isEnabled = isChecked
             btnLoadProxy.isEnabled = isChecked
         }
+
+        spCustomMethod.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            listOf("POST", "GET", "PUT", "PATCH", "DELETE")
+        ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
     }
 
     private fun startChecking() {
@@ -139,8 +169,24 @@ class MainActivity : AppCompatActivity() {
             timeout = etTimeout.text.toString().toIntOrNull() ?: 10,
             useProxy = switchProxy.isChecked,
             module = module,
+            customUrl = etCustomUrl.text.toString().trim(),
+            customMethod = spCustomMethod.selectedItem?.toString() ?: "POST",
+            customBodyTemplate = etCustomBody.text.toString().trim(),
+            customContentType = etCustomContentType.text.toString().trim(),
+            customSuccessMarker = etCustomSuccess.text.toString().trim(),
+            customFailMarker = etCustomFail.text.toString().trim(),
             retries = etRetries.text.toString().toIntOrNull() ?: 1
         )
+
+        if (module == CheckModule.CUSTOM && config.customUrl.isEmpty()) {
+            Toast.makeText(this, "Custom module needs a URL", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (module == CheckModule.CUSTOM && config.customBodyTemplate.isEmpty()) {
+            Toast.makeText(this, "Custom module needs a body template", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         if (comboUri == null) {
             Toast.makeText(this, "Load a combo file first", Toast.LENGTH_SHORT).show()

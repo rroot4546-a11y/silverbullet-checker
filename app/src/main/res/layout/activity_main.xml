@@ -41,6 +41,138 @@
                 android:background="@drawable/spinner_bg"
                 android:layout_marginBottom="16dp" />
 
+            <LinearLayout
+                android:id="@+id/customPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Request URL"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/etCustomUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:background="@drawable/edit_bg"
+                    android:hint="https://example.com/api/login"
+                    android:textColorHint="@color/text_hint"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:paddingHorizontal="12dp"
+                    android:singleLine="true"
+                    android:inputType="textUri"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Method"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="4dp" />
+
+                <Spinner
+                    android:id="@+id/spCustomMethod"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:background="@drawable/spinner_bg"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Body Template"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/etCustomBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:background="@drawable/edit_bg"
+                    android:hint="{&quot;email&quot;:&quot;{email}&quot;,&quot;password&quot;:&quot;{password}&quot;}"
+                    android:textColorHint="@color/text_hint"
+                    android:textColor="@color/text_light"
+                    android:textSize="13sp"
+                    android:fontFamily="monospace"
+                    android:paddingHorizontal="12dp"
+                    android:gravity="top"
+                    android:inputType="textMultiLine"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Content Type"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/etCustomContentType"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:background="@drawable/edit_bg"
+                    android:hint="application/json"
+                    android:text="application/json"
+                    android:textColorHint="@color/text_hint"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:paddingHorizontal="12dp"
+                    android:singleLine="true"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Success Marker (text in response)"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/etCustomSuccess"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:background="@drawable/edit_bg"
+                    android:hint="e.g. &quot;success&quot;:true"
+                    android:textColorHint="@color/text_hint"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:paddingHorizontal="12dp"
+                    android:singleLine="true"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Fail Marker (text in response)"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/etCustomFail"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:background="@drawable/edit_bg"
+                    android:hint="e.g. &quot;error&quot;"
+                    android:textColorHint="@color/text_hint"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:paddingHorizontal="12dp"
+                    android:singleLine="true"
+                    android:layout_marginBottom="16dp" />
+            </LinearLayout>
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
