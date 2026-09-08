@@ -2,6 +2,7 @@ package com.silverbullet.checker.utils
 
 import android.content.Context
 import java.io.File
+import java.io.FileNotFoundException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -13,7 +14,14 @@ object LogStore {
 
     fun init(context: Context) {
         if (file == null) {
-            file = File(context.filesDir, "checker_log.txt")
+            try {
+                file = File(context.filesDir, "checker_log.txt").also { f ->
+                    if (!f.parentFile?.exists()!!) f.parentFile?.mkdirs()
+                    if (!f.exists()) f.createNewFile()
+                }
+            } catch (_: Exception) {
+                file = File(context.filesDir, "checker_log.txt")
+            }
         }
     }
 
@@ -30,7 +38,13 @@ object LogStore {
 
     fun readLog(): String = synchronized(lock) {
         try {
-            file?.readText()?.takeLast(60000) ?: "(no log file yet)"
+            when {
+                file == null -> "(no log file yet \u2014 start a check first)"
+                !file!!.exists() -> "(no log entries yet \u2014 start a check first)"
+                else -> file!!.readText().takeLast(60000)
+            }
+        } catch (_: FileNotFoundException) {
+            "(no log entries yet \u2014 start a check first)"
         } catch (e: Exception) {
             "(failed to read log: ${e.message})"
         }

@@ -50,6 +50,7 @@ class CheckerService : Service() {
     private fun startChecker(config: CheckConfig, comboPath: String, proxyPath: String) {
         if (isRunning) return
         isRunning = true
+        LogStore.log(this, "Checker started, module=${config.module}")
 
         startForeground(NOTIFICATION_ID, createNotification("Starting checker..."))
 

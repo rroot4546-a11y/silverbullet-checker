@@ -23,6 +23,7 @@ class LogActivity : AppCompatActivity() {
         val btnClear = findViewById<Button>(R.id.btnLogClear)
         val btnBack = findViewById<Button>(R.id.btnLogBack)
 
+        LogStore.init(this)
         refresh()
 
         btnRefresh.setOnClickListener { refresh() }
