@@ -4,6 +4,7 @@ import android.app.*
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.webkit.WebView
 import androidx.core.app.NotificationCompat
 import com.silverbullet.checker.MainActivity
 import com.silverbullet.checker.R
@@ -15,6 +16,7 @@ class CheckerService : Service() {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var checker: AccountChecker? = null
+    private var netflixWebView: WebView? = null
     private var isRunning = false
 
     companion object {
@@ -53,7 +55,7 @@ class CheckerService : Service() {
             val combos = loadCombos(comboPath)
             val proxies = loadProxies(proxyPath)
 
-            checker = AccountChecker(config).apply {
+            checker = AccountChecker(config, buildNetflixWebView(config)).apply {
                 loadProxies(proxies)
                 onResult = { result ->
                     sendBroadcast(Intent("CHECKER_RESULT").apply {
@@ -86,8 +88,42 @@ class CheckerService : Service() {
         isRunning = false
         checker?.stopChecking()
         scope.cancel()
+        destroyNetflixWebView()
         stopForeground(true)
         stopSelf()
+    }
+
+    private fun buildNetflixWebView(config: CheckConfig): WebView? {
+        if (config.module != CheckModule.NETFLIX || config.twoCaptchaKey.isNotBlank()) return null
+        return try {
+            runBlocking {
+                withContext(Dispatchers.Main) {
+                    WebView(this@CheckerService).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.databaseEnabled = true
+                        settings.userAgentString =
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+                    }.also { netflixWebView = it }
+                }
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun destroyNetflixWebView() {
+        val wv = netflixWebView ?: return
+        netflixWebView = null
+        try {
+            runBlocking {
+                withContext(Dispatchers.Main) {
+                    wv.stopLoading()
+                    wv.removeAllViews()
+                    wv.destroy()
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     private fun loadCombos(path: String): List<Combo> {
