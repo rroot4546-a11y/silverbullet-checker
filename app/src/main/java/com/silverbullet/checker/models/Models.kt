@@ -131,7 +131,7 @@ data class CheckStats(
         cpm = 0f; startTime = System.currentTimeMillis()
     }
 
-    fun getCpm(): Float {
+    fun computeCpm(): Float {
         val elapsed = (System.currentTimeMillis() - startTime) / 60000f
         return if (elapsed > 0) checked / elapsed else 0f
     }

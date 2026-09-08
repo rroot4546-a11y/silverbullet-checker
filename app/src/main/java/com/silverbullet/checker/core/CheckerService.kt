@@ -141,7 +141,7 @@ class CheckerService : Service() {
     private fun updateNotification(stats: CheckStats) {
         val text = "Checked: ${stats.checked}/${stats.total} | " +
                 "Hits: ${stats.hits} | Fails: ${stats.fails} | " +
-                "CPM: ${String.format("%.0f", stats.getCpm())}"
+                "CPM: ${String.format("%.0f", stats.computeCpm())}"
 
         val notification = createNotification(text)
         val manager = getSystemService(NotificationManager::class.java)

@@ -101,7 +101,7 @@ class AccountChecker(private val config: CheckConfig) {
             }
             workers.awaitAll()
             isRunning = false
-            stats.cpm = stats.getCpm()
+stats.cpm = stats.computeCpm()
             onStatsUpdate?.invoke(stats)
         }
     }
