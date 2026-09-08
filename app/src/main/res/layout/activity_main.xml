@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_dark"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="SilverBullet"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="@color/primary_blue"
+        android:gravity="center"
+        android:layout_marginBottom="24dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Module"
+                android:textColor="@color/text_light"
+                android:textSize="14sp"
+                android:layout_marginBottom="4dp" />
+
+            <Spinner
+                android:id="@+id/spinnerModule"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:background="@drawable/spinner_bg"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Combo File (email:password)"
+                android:textColor="@color/text_light"
+                android:textSize="14sp"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+
+                <EditText
+                    android:id="@+id/etComboFile"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/edit_bg"
+                    android:hint="Select combo file..."
+                    android:textColorHint="@color/text_hint"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:paddingHorizontal="12dp"
+                    android:singleLine="true"
+                    android:enabled="false" />
+
+                <Button
+                    android:id="@+id/btnLoadCombo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:text="LOAD"
+                    android:textAllCaps="false"
+                    android:backgroundTint="@color/primary_blue"
+                    android:textColor="@android:color/white"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Use Proxy"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp" />
+
+                <Switch
+                    android:id="@+id/switchProxy"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+
+                <EditText
+                    android:id="@+id/etProxyFile"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/edit_bg"
+                    android:hint="Select proxy file..."
+                    android:textColorHint="@color/text_hint"
+                    android:textColor="@color/text_light"
+                    android:textSize="14sp"
+                    android:paddingHorizontal="12dp"
+                    android:singleLine="true"
+                    android:enabled="false" />
+
+                <Button
+                    android:id="@+id/btnLoadProxy"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:text="LOAD"
+                    android:textAllCaps="false"
+                    android:backgroundTint="@color/primary_blue"
+                    android:textColor="@android:color/white"
+                    android:layout_marginStart="8dp"
+                    android:enabled="false" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Settings"
+                android:textColor="@color/text_light"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="12dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Threads"
+                        android:textColor="@color/text_light"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/etThreads"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:background="@drawable/edit_bg"
+                        android:text="10"
+                        android:textColor="@color/text_light"
+                        android:textSize="14sp"
+                        android:paddingHorizontal="8dp"
+                        android:inputType="number"
+                        android:singleLine="true"
+                        android:layout_marginEnd="8dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Timeout (s)"
+                        android:textColor="@color/text_light"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/etTimeout"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:background="@drawable/edit_bg"
+                        android:text="10"
+                        android:textColor="@color/text_light"
+                        android:textSize="14sp"
+                        android:paddingHorizontal="8dp"
+                        android:inputType="number"
+                        android:singleLine="true"
+                        android:layout_marginEnd="8dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Retries"
+                        android:textColor="@color/text_light"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/etRetries"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:background="@drawable/edit_bg"
+                        android:text="1"
+                        android:textColor="@color/text_light"
+                        android:textSize="14sp"
+                        android:paddingHorizontal="8dp"
+                        android:inputType="number"
+                        android:singleLine="true" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+
+                <Button
+                    android:id="@+id/btnStart"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:text="START CHECKING"
+                    android:textAllCaps="false"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:backgroundTint="@color/hit_green"
+                    android:textColor="@android:color/white"
+                    android:layout_marginEnd="8dp" />
+
+                <Button
+                    android:id="@+id/btnStop"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:text="STOP"
+                    android:textAllCaps="false"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:backgroundTint="@color/fail_red"
+                    android:textColor="@android:color/white"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnExportHits"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="EXPORT HITS"
+                android:textAllCaps="false"
+                android:backgroundTint="@color/primary_blue"
+                android:textColor="@android:color/white"
+                android:layout_marginBottom="16dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvStats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Ready"
+                android:textColor="@color/text_light"
+                android:textSize="14sp"
+                android:fontFamily="monospace"
+                android:layout_marginBottom="16dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="300dp" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary_blue">#2196F3</color>
+    <color name="primary_blue_dark">#1976D2</color>
+    <color name="background_dark">#121212</color>
+    <color name="card_background">#1E1E1E</color>
+    <color name="text_light">#FFFFFF</color>
+    <color name="text_hint">#888888</color>
+    <color name="hit_green">#4CAF50</color>
+    <color name="fail_red">#F44336</color>
+    <color name="warn_orange">#FF9800</color>
+    <color name="info_blue">#03A9F4</color>
+    <color name="purple_ban">#9C27B0</color>
+</resources>
