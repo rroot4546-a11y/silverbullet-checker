@@ -415,16 +415,33 @@
                     android:visibility="gone" />
             </LinearLayout>
 
-            <Button
-                android:id="@+id/btnExportHits"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="EXPORT HITS"
-                android:textAllCaps="false"
-                android:backgroundTint="@color/primary_blue"
-                android:textColor="@android:color/white"
-                android:layout_marginBottom="16dp"
-                android:visibility="gone" />
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+
+                <Button
+                    android:id="@+id/btnExportHits"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="EXPORT HITS"
+                    android:textAllCaps="false"
+                    android:backgroundTint="@color/primary_blue"
+                    android:textColor="@android:color/white"
+                    android:visibility="gone" />
+
+                <Button
+                    android:id="@+id/btnLogs"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:text="LOG"
+                    android:textAllCaps="false"
+                    android:backgroundTint="@color/fail_red"
+                    android:textColor="@android:color/white"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/tvStats"

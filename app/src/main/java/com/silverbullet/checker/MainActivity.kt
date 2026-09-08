@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStart: Button
     private lateinit var btnStop: Button
     private lateinit var btnExportHits: Button
+    private lateinit var btnLogs: Button
     private lateinit var tvStats: TextView
     private lateinit var recyclerView: RecyclerView
 
@@ -102,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         btnStart = findViewById(R.id.btnStart)
         btnStop = findViewById(R.id.btnStop)
         btnExportHits = findViewById(R.id.btnExportHits)
+        btnLogs = findViewById(R.id.btnLogs)
         tvStats = findViewById(R.id.tvStats)
         recyclerView = findViewById(R.id.recyclerView)
 
@@ -149,6 +151,9 @@ class MainActivity : AppCompatActivity() {
         btnStart.setOnClickListener { startChecking() }
         btnStop.setOnClickListener { stopChecking() }
         btnExportHits.setOnClickListener { exportHits() }
+        btnLogs.setOnClickListener {
+            startActivity(Intent(this, LogActivity::class.java))
+        }
 
         switchProxy.setOnCheckedChangeListener { _, isChecked ->
             etProxyFile.isEnabled = isChecked

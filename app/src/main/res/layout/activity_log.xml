@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_dark"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Error Log"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="@color/primary_blue"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Detailed events from the checker (Netflix browser flow etc.). Open it when you see a timeout/failure to send me the details."
+        android:textColor="@color/text_hint"
+        android:textSize="12sp"
+        android:layout_marginBottom="8dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/edit_bg"
+        android:padding="8dp">
+
+        <TextView
+            android:id="@+id/tvLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_light"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:textIsSelectable="true" />
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="12dp">
+
+        <Button
+            android:id="@+id/btnLogRefresh"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="REFRESH"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/primary_blue"
+            android:textColor="@android:color/white"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/btnLogCopy"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="COPY"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/hit_green"
+            android:textColor="@android:color/white"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/btnLogClear"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="CLEAR"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/warn_orange"
+            android:textColor="@android:color/white"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/btnLogBack"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="BACK"
+            android:textAllCaps="false"
+            android:backgroundTint="@color/fail_red"
+            android:textColor="@android:color/white" />
+    </LinearLayout>
+</LinearLayout>
