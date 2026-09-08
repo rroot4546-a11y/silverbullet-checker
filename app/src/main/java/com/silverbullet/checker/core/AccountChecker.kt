@@ -541,7 +541,7 @@ stats.cpm = stats.computeCpm()
             AccountStatus.ERROR -> stats.errors++
             else -> {}
         }
-        stats.cpm = stats.getCpm()
+        stats.cpm = stats.computeCpm()
         onStatsUpdate?.invoke(stats)
     }
 }
