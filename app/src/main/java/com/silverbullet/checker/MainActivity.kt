@@ -123,8 +123,9 @@ class MainActivity : AppCompatActivity() {
 
         spinnerModule.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                val isCustom = CheckModule.values()[position] == CheckModule.CUSTOM
-                customPanel.visibility = if (isCustom) View.VISIBLE else View.GONE
+                val module = CheckModule.values()[position]
+                val needsUrl = module == CheckModule.CUSTOM || module == CheckModule.GENERIC
+                customPanel.visibility = if (needsUrl) View.VISIBLE else View.GONE
             }
 
             override fun onNothingSelected(parent: AdapterView<*>) {}
@@ -186,8 +187,8 @@ class MainActivity : AppCompatActivity() {
             retries = etRetries.text.toString().toIntOrNull() ?: 1
         )
 
-        if (module == CheckModule.CUSTOM && config.customUrl.isEmpty()) {
-            Toast.makeText(this, "Custom module needs a URL", Toast.LENGTH_SHORT).show()
+        if ((module == CheckModule.CUSTOM || module == CheckModule.GENERIC) && config.customUrl.isEmpty()) {
+            Toast.makeText(this, "This module needs a URL", Toast.LENGTH_SHORT).show()
             return
         }
 
